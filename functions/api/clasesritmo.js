@@ -109,7 +109,21 @@ async function op(env,b){let a=b.action;
  // Una migración fallida nunca debe impedir que el docente consulte sus datos.
  if(a==='teacherGet'){try{await migrateSharedRoster(env)}catch(e){console.error('Migración inicial pendiente:',e.message)}}
  if(a==='create'){let course=Number(b.course),title=String(b.title||'').trim().slice(0,100),youtubeUrl=String(b.youtubeUrl||'').slice(0,500),description=String(b.description||'').slice(0,1000);if(!Number.isInteger(course)||course<0||course>3||course!==teacherCourse||!title||!(/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(youtubeUrl)||(()=>{try{const u=new URL(youtubeUrl);return u.protocol==='https:'&&/\.mp4$/i.test(u.pathname)}catch{return false}})()))fail('Curso, título o enlace de YouTube incorrecto');let video={course,title,youtubeUrl,description,published:!!b.published,createdAt:Date.now()};let vid=id();await commit(env,[write(videoPath(vid),video,null,true)]);return{video:{...video,id:vid}}}
- if(a==='teacherGet'){let [all,prog,students]=await Promise.all([listVideos(env),listProgress(env),roster(env)]),report=[];for(let v of all){for(let ci=0;ci<4;ci++){if(ci!==teacherCourse||v.course!==ci)continue;for(let s of students.filter(x=>Number(x.course)===ci+1)){let p=prog.find(x=>x.videoId===v.id&&x.studentId===String(s.id));report.push({courseLabel:`${ci+1}.º`,studentName:String(s.name||s.fullName),videoTitle:v.title,seconds:p?.seconds||0,coveredSeconds:p?.coveredSeconds||0,duration:p?.duration||0,percent:p?.percent||0,visits:p?.visits||0,lastSeen:p?.lastSeen||''})}}}report.sort((a,b)=>a.courseLabel.localeCompare(b.courseLabel)||a.studentName.localeCompare(b.studentName,'es')||a.videoTitle.localeCompare(b.videoTitle,'es'));return{videos:all.filter(v=>Number(v.course)===teacherCourse).sort((a,b)=>b.createdAt-a.createdAt),report,students:[{course:teacherCourse,students:publicStudents(students,teacherCourse)}]}}
+ if(a==='updateVideo'){
+  const vid=String(b.videoId||'');
+  if(!/^[a-f0-9]{24}$/.test(vid))fail('Vídeo no válido');
+  const old=await get(env,videoPath(vid));
+  if(!old.exists)fail('Vídeo no encontrado',404);
+  if(Number(old.data.course)!==teacherCourse)fail('Este vídeo no pertenece a tu curso',403);
+  const title=String(b.title||'').trim().slice(0,100),youtubeUrl=String(b.youtubeUrl||'').trim().slice(0,500),description=String(b.description||'').trim().slice(0,1000);
+  const urlValid=/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(youtubeUrl)||(()=>{try{const u=new URL(youtubeUrl);return u.protocol==='https:'&&/\.mp4$/i.test(u.pathname)}catch{return false}})();
+  if(!title||!urlValid)fail('Título o enlace de vídeo no válido',400);
+  // El identificador y la fecha de creación permanecen invariables: no se pierde seguimiento ni cambia el enlace directo.
+  const data={...old.data,title,youtubeUrl,description,published:!!b.published,updatedAt:Date.now()};
+  await commit(env,[write(videoPath(vid),data,old)]);
+  return{ok:true,video:{...data,id:vid}};
+ }
+ if(a==='teacherGet'){let [all,prog,students]=await Promise.all([listVideos(env),listProgress(env),roster(env)]),report=[];for(let v of all){for(let ci=0;ci<4;ci++){if(ci!==teacherCourse||v.course!==ci)continue;for(let s of students.filter(x=>Number(x.course)===ci+1)){let p=prog.find(x=>x.videoId===v.id&&x.studentId===String(s.id));report.push({courseLabel:`${ci+1}.º`,studentName:String(s.name||s.fullName),videoTitle:v.title,videoId:v.id,seconds:p?.seconds||0,coveredSeconds:p?.coveredSeconds||0,duration:p?.duration||0,percent:p?.percent||0,visits:p?.visits||0,lastSeen:p?.lastSeen||''})}}}report.sort((a,b)=>a.courseLabel.localeCompare(b.courseLabel)||a.studentName.localeCompare(b.studentName,'es')||a.videoTitle.localeCompare(b.videoTitle,'es'));return{videos:all.filter(v=>Number(v.course)===teacherCourse).sort((a,b)=>b.createdAt-a.createdAt),report,students:[{course:teacherCourse,students:publicStudents(students,teacherCourse)}]}}
 
  if(a==='passwordsExport'){
   const all=await roster(env);
