@@ -19,7 +19,7 @@ let teacherCourse=0,teacherPassword='',course=0,student=null,courses=[],videos=[
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(body){const r=await fetch('/api/clasesritmo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw Error(j.error||'Error del servidor');return j}async function token(){return {teacherCourse:+$('teacherCourse').value,teacherPassword:$('teacherPassword').value}}
 function youtubeId(url){try{const u=new URL(url);if(u.hostname==='youtu.be')return u.pathname.slice(1);if(u.hostname.includes('youtube.com'))return u.searchParams.get('v')||u.pathname.split('/').filter(Boolean).pop();}catch{}return ''}
-function isMp4Url(value){try{const u=new URL(value);return u.protocol==='https:'&&/\\.mp4$/i.test(u.pathname)}catch{return false}}
+function isMp4Url(value){try{const u=new URL(value);return u.protocol==='https:'&&/\.mp4$/i.test(u.pathname)}catch{return false}}
 function directLink(id){return location.origin+location.pathname+'?video='+encodeURIComponent(id)}
 function switchCourse(i){course=i;document.querySelectorAll('.course').forEach(b=>b.classList.toggle('active',+b.dataset.course===i));if(courses[i])$('studentName').innerHTML='<option value="">Selecciona tu nombre…</option>'+courses[i].students.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');if(student)renderVideos()}
 function show(view){['studentView','watchView','teacherView'].forEach(id=>$(id).classList.toggle('hide',id!==view))}
